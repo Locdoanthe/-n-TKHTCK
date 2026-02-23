@@ -1,0 +1,20 @@
+[Version]
+SW990001
+
+[Layers]
+0 = 7, 7
+VISIBLE = -2, 1
+HIDDEN = -2, 2
+CENTER = -2, 7
+DIM = -2, 6
+HATCH = -2, 8
+
+[Entities]
+Geometry [0] = 3, 1, VISIBLE
+Hidden Lines [15] = 6, 2, HIDDEN
+Center Lines [14] = 4, 7, CENTER
+Dimensions [1] = 1, 6, DIM
+Section Lines [5] = 6, 8, HATCH
+
+[Colors]
+

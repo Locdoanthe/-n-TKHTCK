@@ -1,0 +1,712 @@
+dim swApp
+dim storePath
+dim docVisible
+dim errorsDoc as long
+dim warningsDoc as long
+Private Const MAX_PATH = 260
+'Directories only
+Private Const BIF_RETURNONLYFSDIRS = &H1&
+'Windows 2000 (Shell32.dll 5.0) extended dialog
+Private Const BIF_NEWDIALOGSTYLE = &H40
+' show edit box
+Private Const BIF_EDITBOX = &H10&
+' add all dir options
+Private Const BIF_BrowseFolder = BIF_EDITBOX  Or BIF_RETURNONLYFSDIRS Or BIF_NEWDIALOGSTYLE
+' set the virtual desktop as  ini folder 
+Private Const IniFolder = &H0 'Virtual Desktop
+Function getLastFeatureByType(model,typ)  
+  Set feat = model.FirstFeature ' Get the 1st feature in part
+  Set res = Nothing
+  Count = 0
+  Do While Not feat Is Nothing ' While we have a valid feature
+    If feat.GetTypeName() = typ Then
+      Set res = feat
+    End If
+    Set feat = feat.GetNextFeature() ' Get the next feature
+  Loop ' Continue until no more
+  Set getLastFeatureByType = res
+End Function
+' this code with copy a matrix to a other
+Function copyMat4x4(source)
+Dim res(0 To 15) As Double
+For i = 0 To 15
+ res(i) = source(i)
+Next
+copyMat4x4 = res
+End Function
+
+' This code creates a mat from a sw mat
+Function createMatFromSWMat(source)
+ Dim res(0 To 15) As Double
+ res(0) = source(0)
+ res(1) = source(1)
+ res(2) = source(2)
+ res(3) = 0
+ res(4) = source(3)
+ res(5) = source(4)
+ res(6) = source(5)
+ res(7) = 0
+ res(8) = source(6)
+ res(9) = source(7)
+ res(10) = source(8)
+ res(11) = 0
+ res(12) = source(9)
+ res(13) = source(10)
+ res(14) = source(11)
+ res(15) = source(12)
+ createMatFromSWMat = res
+End Function
+Function createSWMatFromMat(source)
+ Dim res(0 To 15) As Double
+ res(0) = source(0)
+ res(1) = source(1)
+ res(2) = source(2)
+ res(3) = source(4)
+ res(4) = source(5)
+ res(5) = source(6)
+ res(6) = source(8)
+ res(7) = source(9)
+ res(8) = source(10)
+ res(9) = source(12)
+ res(10) = source(13)
+ res(11) = source(14)
+ res(12) = source(15)
+ res(13) = 0
+ res(14) = 0
+ res(15) = 0
+ createSWMatFromMat = res
+End Function
+Function createMat4x4FromValues(x1,x2,x3,y1,y2,y3,z1,z2,z3,t1,t2,t3)
+ Dim res(0 To 15) As Double
+ res(0) = x1
+ res(1) = x2
+ res(2) = x3
+ res(3) = 0
+ res(4) = y1
+ res(5) = y2
+ res(6) = y3
+ res(7) = 0
+ res(8) = z1
+ res(9) = z2
+ res(10) =z3
+ res(11) = 0
+ res(12) = t1
+ res(13) = t2
+ res(14) = t3
+ res(15) = 1
+ createMat4x4FromValues = res
+End Function
+' this code will mult a common mat with any other stuff
+Function multMatMat(ld, xld, yld, rd, xrd, yrd)
+  mulRes = yld * xrd
+  'Dim od(0 To 0) As Variant
+  ReDim od(mulRes - 1) As Double
+  For i = 0 To mulRes - 1
+   od(i) = 0#
+  Next
+  y = 0
+  While y < yld
+    x = 0
+    While x < xrd
+      i = 0
+      While i < xld
+       od(x * yld + y) = od(x * yld + y) + ld(i * yld + y) * rd(x * yrd + i)
+       i = i + 1
+      Wend
+      x = x + 1
+    Wend
+    y = y + 1
+  Wend
+  multMatMat = od
+
+End Function
+' this code will mult a vector with a matrix
+Function mulMat4x4Values3d(mat, x,y,z)
+  tmp = createVec4d(x, y, z, 1)
+  res = multMatMat(mat, 4, 4, tmp, 1, 3)
+  mulMat4x4Values3d = createVec3d(res(0), res(1), res(2))
+End Function
+Function mulMat4x4Vec3d(mat, vec)
+  tmp = createVec4d(vec(0), vec(1), vec(2), 1)
+  res = multMatMat(mat, 4, 4, tmp, 1, 3)
+  mulMat4x4Vec3d = createVec3d(res(0), res(1), res(2))
+End Function
+Function mulMat4x4Mat4x4(mat1, mat2)
+  mulMat4x4Mat4x4 = multMatMat(mat1, 4, 4, mat2, 4, 4)
+End Function
+' create a 4x4 matrix
+Function createMat4x4()
+ Dim res(0 To 15) As Double
+ for i = 0 to 15 
+ res(i) = 0
+ next
+ createMat4x4 = res
+End Function
+Function createMat4x4Ident()
+ Dim res(0 To 15) As Double
+ res(0) = 1
+ res(5) = 1
+ res(10) = 1
+ res(15) = 1
+ res(1) = 0
+ res(2) = 0
+ res(3) = 0
+ res(4) = 0
+ res(6) = 0
+ res(7) = 0
+ res(8) = 0
+ res(9) = 0
+ res(11) = 0
+ res(12) = 0
+ res(13) = 0
+ res(14) = 0
+ createMat4x4Ident = res
+End Function
+' this function create a new vector
+Function createVec3d(x, y, z)
+ Dim res(0 To 2) As Double
+ res(0) = x
+ res(1) = y
+ res(2) = z
+ createVec3d = res
+End Function
+' this function create a new vector
+Function createVec4d(x, y, z, w)
+ Dim res(0 To 3) As Double
+ res(0) = x
+ res(1) = y
+ res(2) = z
+ res(3) = w
+ createVec4d = res
+End Function
+
+Function getMatTVec(mat)
+ getMatTVec = createVec3d(mat(12), mat(13), mat(14))
+End Function
+
+Sub setMatTVec(mat, v)
+ mat(12) = v(0)
+ mat(13) = v(1)
+ mat(14) = v(2)
+End Sub
+Sub setMatXVec(mat, v)
+ mat(0) = v(0)
+ mat(1) = v(1)
+ mat(2) = v(2)
+End Sub
+Sub setMatYVec(mat, v)
+ mat(4) = v(0)
+ mat(5) = v(1)
+ mat(6) = v(2)
+End Sub
+Sub setMatZVec(mat, v)
+ mat(8) = v(0)
+ mat(9) = v(1)
+ mat(10) = v(2)
+End Sub
+Sub setMatScale(mat, s)
+ mat(15) = s
+End Sub
+Function getMatXVec(mat)
+ getMatXVec = createVec3d(mat(0), mat(1), mat(2))
+End Function
+Function getMatYVec(mat)
+ getMatYVec = createVec3d(mat(4), mat(5), mat(6))
+End Function
+Function getMatZVec(mat)
+ getMatZVec = createVec3d(mat(8), mat(9), mat(10))
+End Function
+
+Function negVec3d(v)
+ negVec3d = createVec3d(-v(0), -v(1), -v(2))
+End Function
+Function scaleVec3d(v,s)
+ scaleVec3d = createVec3d(v(0)*s,v(1)*s,v(2)*s)
+End Function
+' invert a 4x4 matrix
+Function invMat4x4(source)
+target = copyMat4x4(source)
+setMatTVec target, createVec3d(0, 0, 0)
+ target(1) = source(4)
+ target(4) = source(1)
+ target(2) = source(8)
+ target(8) = source(2)
+ target(6) = source(9)
+ target(9) = source(6)
+ setMatScale target,1
+ t = getMatTVec(source)
+ v = mulMat4x4Vec3d(target, t)
+ setMatTVec target, negVec3d(v)
+ invMat4x4 = target
+End Function
+Function IsEqual(argVec3DA, argVec3DB)
+  For i = 0 To 2
+    If( argVec3DA(i) <> argVec3DB(i) ) Then
+      Exit For
+    End If
+  Next
+  If(i = 3) Then
+    IsEqual = 1
+  Else
+    IsEqual = 0
+  End If
+End Function
+Function getFaceFromModel(part, pos, normal)
+ Dim partBodies As Variant
+ partBodies = part.GetBodies(swSolidBody)
+ For k = LBound(partBodies) To UBound(partBodies)
+   found = 0
+   Dim body As Object
+   Set body = partBodies(k)
+   Set face = body.GetFirstFace()
+   Set getFaceFromModel = nothing
+   minDist = -1
+   Do While Not face Is Nothing ' While we have a valid feature
+     Set sur = face.GetSurface()
+     If sur.IsPlane() Then
+       planePara = sur.PlaneParams
+       faceNormal = face.normal
+       nTest = faceNormal(0) * normal(0) + faceNormal(1) * normal(1) + faceNormal(2) * normal(2)
+       If nTest > 1 - 0.000001 Then
+         ' check projection
+         closeRes = face.GetClosestPointOn(pos(0), pos(1), pos(2))
+         dTest = (pos(0) - closeRes(0)) * (pos(0) - closeRes(0)) + (pos(1) - closeRes(1)) * (pos(1) - closeRes(1)) + (pos(2) - closeRes(2)) * (pos(2) - closeRes(2))
+         If ( dTest < minDist Or minDist = -1 ) Then
+           Set getFaceFromModel = face
+           minDist = dTest
+           found=1
+         End If
+       End If
+     else
+       If sur.IsCylinder() then
+         closeRes = face.GetClosestPointOn(pos(0), pos(1), pos(2))
+         dTest = (pos(0) - closeRes(0)) * (pos(0) - closeRes(0)) + (pos(1) - closeRes(1)) * (pos(1) - closeRes(1)) + (pos(2) - closeRes(2)) * (pos(2) - closeRes(2))
+         If ( dTest < minDist Or minDist = -1 ) Then
+           res=sur.EvaluateAtPoint(closeRes(0),closeRes(1),closeRes(2))
+           nTest=res(0)*normal(0)+res(1)*normal(1)+res(2)*normal(2)
+           if nTest>1-0.00000001 then
+             Set getFaceFromModel = face
+             found=1
+           End if
+         End if
+       End if
+     End if
+     Set face = face.GetNextFace ' Get the next Face
+   Loop
+   If (found = 1) Then
+     Exit For
+   End If
+ Next k
+End Function
+Function getEdgeFromModel(part, pos,byref edgeRet)
+ Dim partBodies As Variant
+ partBodies = part.GetBodies(swSolidBody)
+ For k = LBound(partBodies) To UBound(partBodies)
+   Dim body As Object
+   Set body = partBodies(k)
+   edges= body.GetEdges()
+   start= LBound(edges)
+   ende = UBound(edges)
+   For i = start To ende
+     Set edge = edges(i)
+     closeRes=edge.GetClosestPointOn(pos(0),pos(1),pos(2))
+     dTest = (pos(0) - closeRes(0)) * (pos(0) - closeRes(0)) + (pos(1) - closeRes(1)) * (pos(1) - closeRes(1)) + (pos(2) - closeRes(2)) * (pos(2) - closeRes(2))
+     If dTest < 0.00000001 Then
+       set edgeRet=edge
+       getEdgeFromModel=true
+       exit function
+     End If
+   Next i
+ Next k
+ getEdgeFromModel=false
+End Function
+sub cLn(part,wMat,x1,y1,x2,y2)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+Part.SketchManager.CreateLine pk1(0),pk1(1),0,pk2(0),pk2(1),0
+end sub
+sub cCLn(part,wMat,x1,y1,x2,y2)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+Part.CreateCenterLineVB pk1(0),pk1(1),0,pk2(0),pk2(1),0
+end sub
+sub cArc(part,wMat,x1,y1,x2,y2,x3,y3)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+pk3=mulMat4x4Values3d(wMat,x3,y3,0)
+Part.SketchManager.Create3PointArc pk1(0),pk1(1),0,pk3(0),pk3(1),0,pk2(0),pk2(1),0
+end sub
+sub cCir(part,wMat,x1,y1,rad)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+Part.SketchManager.CreateCircleByRadius pk1(0),pk1(1),0,rad
+end sub
+sub cEllipse(part,wMat,x1,y1,x2,y2,x3,y3)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+pk3=mulMat4x4Values3d(wMat,x3,y3,0)
+Part.SketchManager.CreateEllipse pk1(0),pk1(1),0,pk2(0),pk2(1),0,pk3(0),pk3(1),0
+end sub
+sub cEllipseArc(part,wMat,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+pk3=mulMat4x4Values3d(wMat,x3,y3,0)
+pk4=mulMat4x4Values3d(wMat,x4,y4,0)
+pk5=mulMat4x4Values3d(wMat,x5,y5,0)
+Part.SketchManager.CreateEllipticalArc  pk1(0),pk1(1),0,pk2(0),pk2(1),0,pk3(0),pk3(1),0,pk4(0),pk4(1),0,pk5(0),pk5(1),0,1
+end sub
+Public Function  BrowseForFolder
+Dim objFolder, objShell
+Set objShell = CreateObject("Shell.Application")
+Set objFolder = objShell.BrowseForFolder(0, "Please select the folder..", BIF_BrowseFolder, IniFolder)
+If Not (objFolder Is Nothing) Then
+		BrowseForFolder = objFolder.Self.path
+End If
+End Function
+Sub SelectCommonEdge(argFaceA, argFaceB)
+  edgesA = argFaceA.GetEdges
+  edgesB = argFaceB.GetEdges
+  For Each edgeA In edgesA
+    Set vertexA1 = edgeA.GetStartVertex
+    Set vertexA2 = edgeA.GetEndVertex
+    pointA1 = vertexA1.GetPoint
+    pointA2 = vertexA2.GetPoint
+    For Each edgeB In edgesB
+      Set vertexB1 = edgeB.GetStartVertex
+      Set vertexB2 = edgeB.GetEndVertex
+      pointB1 = vertexB1.GetPoint
+      pointB2 = vertexB2.GetPoint
+      If ( (IsEqual(pointA1, pointB1) And IsEqual(pointA2, pointB2)) Or (IsEqual(pointA1, pointB2) And IsEqual(pointA2, pointB1)) ) Then
+        edgeA.Select(True)
+        Exit Sub
+      End If
+    Next
+  Next
+End Sub
+Sub CreatePart0
+dim errors as long
+dim warnings as long
+if (docVisible=0) then
+ swApp.DocumentVisible 0, 1
+end if
+set res=swApp.OpenDoc6 ( storePath & "C-SPB10B23-N-25.sldprt",1,3,"", errors, warnings)
+if not res is nothing then
+ if (docVisible=0) then
+  swApp.DocumentVisible 1, 1
+ end if
+ exit sub
+end if
+if (docVisible=0) then
+ swApp.DocumentVisible 1, 1
+end if
+Dim longstatus As Long
+Dim sPartTemplateName As String
+sPartTemplateName = swApp.GetUserPreferenceStringValue(8)
+Set part = swApp.NewDocument(sPartTemplateName, 0, 0, 0)
+swApp.ActivateDoc2 "C-SPB10B23-N-25.sldprt", False, longstatus
+Set part = swApp.ActiveDoc
+part.SketchManager.AddToDB = true
+part.SketchManager.DisplayWhenAdded = false
+part.ActiveView.EnableGraphicsUpdate = false
+Set modelExt = part.Extension
+Set customPropMgr = modelExt.CustomPropertyManager("")
+customPropMgr.Add2 "NB", 30, "C-SPB10B23-N-25"
+customPropMgr.Add2 "NN", 30, "C-SPB10B"
+customPropMgr.Add2 "NT", 30, "Economy Sprocket10B"
+customPropMgr.Add2 "NBSYN", 30, "$PN."
+customPropMgr.Add2 "LINA", 30, "C-SPB10B23-N-25"
+customPropMgr.Add2 "CATALOG", 30, "Misumi"
+customPropMgr.Add2 "PN", 30, "C-SPB10B23-N-25"
+customPropMgr.Add2 "NT", 30, "23"
+customPropMgr.Add2 "SPEC", 30, "New JIS Key Groove Hole Tapped"
+customPropMgr.Add2 "D", 30, "25"
+customPropMgr.Add2 "DPP", 30, "116.58"
+customPropMgr.Add2 "DOO", 30, "123.5"
+customPropMgr.Add2 "H", 30, "80"
+customPropMgr.Add2 "L", 30, "30"
+customPropMgr.Add2 "LL", 30, "7.0"
+customPropMgr.Add2 "M", 30, "8"
+customPropMgr.Add2 "BBTT", 30, "8x3.3"
+customPropMgr.Add2 "SUPPLIER", 30, "MISUMI"
+customPropMgr.Add2 "ARTICLENO", 30, "C-SPB10B23-N-25"
+customPropMgr.Add2 "BOMINFO", 30, "C-SPB10B23-N-25"
+customPropMgr.Add2 "CREATOR", 30, "CADENAS GmbH"
+customPropMgr.Add2 "IsFastener", 30, "0"
+part.SummaryInfo(0)="C-SPB10B23-N-25"
+part.SummaryInfo(4)="Economy Sprocket10B"
+part.SummaryInfo(2)="Cadenas PARTsolutions"
+valRGB=part.MaterialPropertyValues
+valRGB(0)=0.689999997615814
+valRGB(1)=0.689999997615814
+valRGB(2)=0.689999997615814
+valRGB(7)=0
+part.MaterialPropertyValues=valRGB
+Dim featMgr as object
+set featMgr = part.FeatureManager
+codeBag0 part,featMgr
+part.ActiveView.EnableGraphicsUpdate = true
+part.SketchManager.DisplayWhenAdded = true
+part.SketchManager.AddToDB = false
+part.EditRebuild3
+part.Rebuild swRebuildAll
+Set modelExt = part.Extension
+modelExt.SaveAs storePath & "C-SPB10B23-N-25.sldprt",0,0,nothing,errors,warnings
+swApp.CloseDoc storePath &"C-SPB10B23-N-25.sldprt"
+End Sub
+sub codeBag1(part,wMat)
+cLn part,wMat,-0.03,0.03935,-0.03,0.0125
+cLn part,wMat,-0.03,0.0125,0,0.0125
+cLn part,wMat,0,0.0125,0,0.05385
+cArc part,wMat,0,0.05385,-0.000294370755506101,0.0579024059229355,-0.0016,0.06175
+cLn part,wMat,-0.0016,0.06175,-0.0075,0.06175
+cArc part,wMat,-0.0075,0.06175,-0.0088056292444939,0.0579024059229355,-0.0091,0.05385
+cLn part,wMat,-0.0091,0.05385,-0.0091,0.04
+cLn part,wMat,-0.0091,0.04,-0.02935,0.04
+cLn part,wMat,-0.02935,0.04,-0.03,0.03935
+cCLn part,wMat,0,0,-0.00455,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag2(part,wMat)
+cCir part,wMat,0,0,0.11658
+cLn part,wMat,-0.061703536038848,-0.00278872238004623,-0.0615085569561836,-0.00563921567049063
+cLn part,wMat,-0.0615085569561836,-0.00563921567049063,-0.0559431901279578,-0.0069061823722747
+cArc part,wMat,-0.0559431901279578,-0.0069061823722747,-0.0520970643055765,-0.0108258944545306,-0.0540631568114223,-0.0159533993943457
+cLn part,wMat,-0.0540631568114223,-0.0159533993943457,-0.0586630132485049,-0.0193327237816125
+cLn part,wMat,-0.0586630132485049,-0.0193327237816125,-0.0577062106331695,-0.0220249083215043
+cLn part,wMat,-0.0577062106331695,-0.0220249083215043,-0.052005399178534,-0.0217433744605865
+cArc part,wMat,-0.052005399178534,-0.0217433744605865,-0.0472443724711905,-0.0244800606576746,-0.0477541726567405,-0.029947869215057
+cLn part,wMat,-0.0477541726567405,-0.029947869215057,-0.0512717231309487,-0.034442905501623
+cLn part,wMat,-0.0512717231309487,-0.034442905501623,-0.0496240586558409,-0.0367771142795632
+cLn part,wMat,-0.0496240586558409,-0.0367771142795632,-0.0442106056809091,-0.034967959934476
+cArc part,wMat,-0.0442106056809091,-0.034967959934476,-0.038887781659239,-0.0363186527506646,-0.0379034799769118,-0.0417212425784731
+cLn part,wMat,-0.0379034799769118,-0.0417212425784731,-0.0400778438612962,-0.0469986144863862
+cLn part,wMat,-0.0400778438612962,-0.0469986144863862,-0.0378615172629714,-0.0488017299156096
+cLn part,wMat,-0.0378615172629714,-0.0488017299156096,-0.0331369138099944,-0.0455991317877978
+cArc part,wMat,-0.0331369138099944,-0.0455991317877978,-0.0276470619813855,-0.0454636565159187,-0.0252416595840786,-0.0504003422418285
+cLn part,wMat,-0.0252416595840786,-0.0504003422418285,-0.0259115742563872,-0.0560686512390491
+cLn part,wMat,-0.0259115742563872,-0.0560686512390491,-0.0232909603396237,-0.0572069444968744
+cLn part,wMat,-0.0232909603396237,-0.0572069444968744,-0.0196056086330861,-0.0528484246385662
+cArc part,wMat,-0.0196056086330861,-0.0528484246385662,-0.0143558861932653,-0.0512368288597765,-0.0107077807728032,-0.0553414790873314
+cLn part,wMat,-0.0107077807728032,-0.0553414790873314,-0.0098235617264467,-0.0609803326263237
+cLn part,wMat,-0.0098235617264467,-0.0609803326263237,-0.0069930194369398,-0.0613693817091632
+cLn part,wMat,-0.0069930194369398,-0.0613693817091632,-0.00462024515355344,-0.0561781915993477
+cArc part,wMat,-0.00462024515355344,-0.0561781915993477,-1.0036218302523e-17,-0.0532100000000001,0.0046202451535534,-0.0561781915993477
+cLn part,wMat,0.0046202451535534,-0.0561781915993477,0.00699301943693976,-0.0613693817091632
+cLn part,wMat,0.00699301943693976,-0.0613693817091632,0.00982356172644666,-0.0609803326263237
+cLn part,wMat,0.00982356172644666,-0.0609803326263237,0.0107077807728032,-0.0553414790873314
+cArc part,wMat,0.0107077807728032,-0.0553414790873314,0.0143558861932653,-0.0512368288597765,0.0196056086330861,-0.0528484246385662
+cLn part,wMat,0.0196056086330861,-0.0528484246385662,0.0232909603396236,-0.0572069444968744
+cLn part,wMat,0.0232909603396236,-0.0572069444968744,0.0259115742563872,-0.0560686512390491
+cLn part,wMat,0.0259115742563872,-0.0560686512390491,0.0252416595840785,-0.0504003422418285
+cArc part,wMat,0.0252416595840785,-0.0504003422418285,0.0276470619813854,-0.0454636565159187,0.0331369138099944,-0.0455991317877978
+cLn part,wMat,0.0331369138099944,-0.0455991317877978,0.0378615172629714,-0.0488017299156097
+cLn part,wMat,0.0378615172629714,-0.0488017299156097,0.0400778438612961,-0.0469986144863863
+cLn part,wMat,0.0400778438612961,-0.0469986144863863,0.0379034799769118,-0.0417212425784731
+cArc part,wMat,0.0379034799769118,-0.0417212425784731,0.038887781659239,-0.0363186527506647,0.0442106056809091,-0.034967959934476
+cLn part,wMat,0.0442106056809091,-0.034967959934476,0.0496240586558409,-0.0367771142795632
+cLn part,wMat,0.0496240586558409,-0.0367771142795632,0.0512717231309487,-0.034442905501623
+cLn part,wMat,0.0512717231309487,-0.034442905501623,0.0477541726567405,-0.0299478692150571
+cArc part,wMat,0.0477541726567405,-0.0299478692150571,0.0472443724711905,-0.0244800606576747,0.052005399178534,-0.0217433744605865
+cLn part,wMat,0.052005399178534,-0.0217433744605865,0.0577062106331695,-0.0220249083215043
+cLn part,wMat,0.0577062106331695,-0.0220249083215043,0.0586630132485049,-0.0193327237816125
+cLn part,wMat,0.0586630132485049,-0.0193327237816125,0.0540631568114223,-0.0159533993943458
+cArc part,wMat,0.0540631568114223,-0.0159533993943458,0.0520970643055765,-0.0108258944545307,0.0559431901279578,-0.00690618237227474
+cLn part,wMat,0.0559431901279578,-0.00690618237227474,0.0615085569561836,-0.00563921567049066
+cLn part,wMat,0.0615085569561836,-0.00563921567049066,0.0617035360388481,-0.00278872238004627
+cLn part,wMat,0.0617035360388481,-0.00278872238004627,0.0563625239478864,-0.000775738922501844
+cArc part,wMat,0.0563625239478864,-0.000775738922501844,0.0530859552086287,0.00363117881513413,0.0557319305886566,0.00844320966890653
+cLn part,wMat,0.0557319305886566,0.00844320966890653,0.0607490949926824,0.0111647118091082
+cLn part,wMat,0.0607490949926824,0.0111647118091082,0.0601677898360846,0.013962105802892
+cLn part,wMat,0.0601677898360846,0.013962105802892,0.054481740524526,0.0144594545564546
+cArc part,wMat,0.054481740524526,0.0144594545564546,0.0501377036659425,0.0178189441636182,0.0513872887142123,0.0231664074740591
+cLn part,wMat,0.0513872887142123,0.0231664074740591,0.0554841505621915,0.0271406036889835
+cLn part,wMat,0.0554841505621915,0.0271406036889835,0.054169673910502,0.0296774284708138
+cLn part,wMat,0.054169673910502,0.0296774284708138,0.04856029564384,0.028622256438562
+cArc part,wMat,0.04856029564384,0.028622256438562,0.0434709680070857,0.0306851599397321,0.0432314867170384,0.0361714588161231
+cLn part,wMat,0.0432314867170384,0.0361714588161231,0.0461042005076021,0.0411036011532471
+cLn part,wMat,0.0461042005076021,0.0411036011532471,0.0441540410807464,0.0431917120342567
+cLn part,wMat,0.0441540410807464,0.0431917120342567,0.0390373557838212,0.0406622764987317
+cArc part,wMat,0.0390373557838212,0.0406622764987317,0.0335801895175894,0.0412755977783823,0.0318694031209537,0.0464938385312086
+cLn part,wMat,0.0318694031209537,0.0464938385312086,0.0333049128140471,0.0520181325564377
+cLn part,wMat,0.0333049128140471,0.0520181325564377,0.0308637050153291,0.0535026639050538
+cLn part,wMat,0.0308637050153291,0.0535026639050538,0.0266191938293361,0.0496865615285279
+cArc part,wMat,0.0266191938293361,0.0496865615285279,0.0211989219907186,0.0488048133531052,0.0181437116882061,0.0533679829375929
+cLn part,wMat,0.0181437116882061,0.0533679829375929,0.0180355520969122,0.0590747170350393
+cLn part,wMat,0.0180355520969122,0.0590747170350393,0.0152843491409804,0.0598455679524141
+cLn part,wMat,0.0152843491409804,0.0598455679524141,0.012226808043238,0.0550258215906475
+cArc part,wMat,0.012226808043238,0.0550258215906475,0.00724542739841127,0.0527143991885932,0.00307238416150221,0.0562840681917725
+cLn part,wMat,0.00307238416150221,0.0562840681917725,0.00142857698791011,0.06175
+cLn part,wMat,0.00142857698791011,0.06175,-0.00142857698791011,0.06175
+cLn part,wMat,-0.00142857698791011,0.06175,-0.00307238416150222,0.0562840681917725
+cArc part,wMat,-0.00307238416150222,0.0562840681917725,-0.00724542739841128,0.0527143991885932,-0.0122268080432379,0.0550258215906474
+cLn part,wMat,-0.0122268080432379,0.0550258215906474,-0.0152843491409804,0.059845567952414
+cLn part,wMat,-0.0152843491409804,0.059845567952414,-0.0180355520969121,0.0590747170350392
+cLn part,wMat,-0.0180355520969121,0.0590747170350392,-0.0181437116882061,0.0533679829375929
+cArc part,wMat,-0.0181437116882061,0.0533679829375929,-0.0211989219907185,0.0488048133531052,-0.0266191938293361,0.0496865615285279
+cLn part,wMat,-0.0266191938293361,0.0496865615285279,-0.0308637050153291,0.0535026639050537
+cLn part,wMat,-0.0308637050153291,0.0535026639050537,-0.033304912814047,0.0520181325564376
+cLn part,wMat,-0.033304912814047,0.0520181325564376,-0.0318694031209536,0.0464938385312086
+cArc part,wMat,-0.0318694031209536,0.0464938385312086,-0.0335801895175893,0.0412755977783822,-0.0390373557838212,0.0406622764987317
+cLn part,wMat,-0.0390373557838212,0.0406622764987317,-0.0441540410807463,0.0431917120342567
+cLn part,wMat,-0.0441540410807463,0.0431917120342567,-0.046104200507602,0.0411036011532471
+end sub
+
+sub codeBag3(part,wMat)
+cLn part,wMat,-0.046104200507602,0.0411036011532471,-0.0432314867170383,0.0361714588161231
+cArc part,wMat,-0.0432314867170383,0.0361714588161231,-0.0434709680070856,0.0306851599397321,-0.04856029564384,0.028622256438562
+cLn part,wMat,-0.04856029564384,0.028622256438562,-0.054169673910502,0.0296774284708138
+cLn part,wMat,-0.054169673910502,0.0296774284708138,-0.0554841505621914,0.0271406036889835
+cLn part,wMat,-0.0554841505621914,0.0271406036889835,-0.0513872887142122,0.0231664074740592
+cArc part,wMat,-0.0513872887142122,0.0231664074740592,-0.0501377036659425,0.0178189441636182,-0.0544817405245259,0.0144594545564546
+cLn part,wMat,-0.0544817405245259,0.0144594545564546,-0.0601677898360845,0.0139621058028921
+cLn part,wMat,-0.0601677898360845,0.0139621058028921,-0.0607490949926824,0.0111647118091082
+cLn part,wMat,-0.0607490949926824,0.0111647118091082,-0.0557319305886565,0.00844320966890658
+cArc part,wMat,-0.0557319305886565,0.00844320966890658,-0.0530859552086286,0.00363117881513415,-0.0563625239478864,-0.000775738922501818
+cLn part,wMat,-0.0563625239478864,-0.000775738922501818,-0.061703536038848,-0.00278872238004623
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag4(part,wMat)
+cLn part,wMat,8.88178419700125e-19,0.012,-0.0033235,0.012
+cLn part,wMat,-0.0033235,0.012,-0.0033235,0.0393235
+cLn part,wMat,-0.0033235,0.0393235,-0.004,0.04
+cLn part,wMat,-0.004,0.04,2.44929359829471e-18,0.04
+cLn part,wMat,2.44929359829471e-18,0.04,8.88178419700125e-19,0.012
+cCLn part,wMat,2.44929359829471e-18,0.04,8.88178419700125e-19,0.012
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag5(part,wMat)
+cLn part,wMat,0,0,0.00166175,0.00287823542947758
+cLn part,wMat,0.00166175,0.00287823542947758,0.0357168999657174,-0.0167835145705224
+cLn part,wMat,0.0357168999657174,-0.0167835145705224,0.0366410161513775,-0.0165358983848623
+cLn part,wMat,0.0366410161513775,-0.0165358983848623,0.0346410161513775,-0.02
+cLn part,wMat,0.0346410161513775,-0.02,0,0
+cCLn part,wMat,0.0346410161513775,-0.02,0,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag6(part,wMat)
+cLn part,wMat,-0.004,0.0158,-0.004,0
+cLn part,wMat,-0.004,0,0.004,0
+cLn part,wMat,0.004,0,0.004,0.0158
+cLn part,wMat,0.004,0.0158,-0.004,0.0158
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag0(part,featMgr)
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(0,0,-1),createVec3d(0,1,0),1
+set feat4=part.Extension.GetLastFeatureAdded()
+feat4.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(0,0,-1,0,1,0,1,0,0,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag1 part,wMat
+set feat4=part.Extension.GetLastFeatureAdded()
+feat4.select2 false,0
+featMgr.FeatureRevolve 6.28318530717959,1,6.28318530717959,0,0,1,1,1
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(1,0,0),createVec3d(0,1,0),1
+set feat6=part.Extension.GetLastFeatureAdded()
+feat6.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag2 part,wMat
+codeBag3 part,wMat
+set feat6=part.Extension.GetLastFeatureAdded()
+feat6.select2 false,0
+featMgr.FeatureCut3 0,0,0,0,0,0.0092,0.0092,1,1,0,0,0,0,0,0,0,0,0,1,1,false,false,false,0,0,0
+part.CreatePlaneFixed2 createVec3d(0,0,0.023),createVec3d(1,0,0.023),createVec3d(0,1,0.023),1
+set feat9=part.Extension.GetLastFeatureAdded()
+feat9.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0.023)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag4 part,wMat
+set feat9=part.Extension.GetLastFeatureAdded()
+feat9.select2 false,0
+featMgr.FeatureRevolveCut2 6.28318530717959,1,6.28318530717959,0,0,1,1,false,false,false
+ if getEdgeFromModel(part,createVec3d(2.44929359829471e-18,0.0393235,0.0196765),cylEdge) then
+   cylEdge.Select(false)
+   Part.InsertCosmeticThread 0,0.008,0.0242,""
+ elseif getEdgeFromModel(part,createVec3d(2.44929359829471e-18,0.0158,0.0196765),cylEdge) then
+   cylEdge.Select(false)
+   Part.InsertCosmeticThread 0,0.008,0.0242,""
+ End If
+part.CreatePlaneFixed2 createVec3d(0,0,0.023),createVec3d(1,0,0.023),createVec3d(0,1,0.023),1
+set feat11=part.Extension.GetLastFeatureAdded()
+feat11.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0.023)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag5 part,wMat
+set feat11=part.Extension.GetLastFeatureAdded()
+feat11.select2 false,0
+featMgr.FeatureRevolveCut2 6.28318530717959,1,6.28318530717959,0,0,1,1,false,false,false
+ if getEdgeFromModel(part,createVec3d(0.035651707723231,-0.0168964308467682,0.0220782269489227),cylEdge) then
+   cylEdge.Select(false)
+   Part.InsertCosmeticThread 0,0.008,0.0275,""
+ elseif getEdgeFromModel(part,createVec3d(0.0124218753048191,-0.00348468084676819,0.0220782269489227),cylEdge) then
+   cylEdge.Select(false)
+   Part.InsertCosmeticThread 0,0.008,0.0275,""
+ End If
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(1,0,0),createVec3d(0,1,0),1
+set feat13=part.Extension.GetLastFeatureAdded()
+feat13.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag6 part,wMat
+set feat13=part.Extension.GetLastFeatureAdded()
+feat13.select2 false,0
+featMgr.FeatureCut3 1,0,1,0,0,0.03,0.03,1,1,0,0,0,0,0,0,0,0,0,1,1,false,false,false,0,0,0
+end sub
+
+sub main
+set swApp = Application.SldWorks
+code = swApp.RevisionNumber
+found = InStr(code, ".")
+If (found > 0) Then
+  code = Left(code, found-1)
+  docVisible=1
+  If (CInt(code) >= 18) Then
+    docVisible=0
+  End If
+End If
+swApp.SetUserPreferenceToggle 11, FALSE
+swApp.SetUserPreferenceToggle 97, FALSE
+storePath=BrowseForFolder
+If (storePath <> "") Then
+   If ((Right(storePath, 1) <> "\") And (Right(storePath, 1) <> "/")) Then
+       storePath = storePath + "\"
+   End If
+   createPart0
+Dim longstatus As Long
+if (docVisible=0) then
+ swApp.DocumentVisible 0, 1
+end if
+set res=swApp.OpenDoc6 ( storePath & "C-SPB10B23-N-25.sldprt",1,3,"", errorsDoc, warningsDoc)
+swApp.ActivateDoc2 "C-SPB10B23-N-25.sldprt", False, longstatus
+if not res is nothing then
+ if (docVisible=0) then
+  swApp.DocumentVisible 1, 1
+ end if
+ exit sub
+end if
+End If
+end sub
